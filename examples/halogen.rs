@@ -675,7 +675,7 @@ fn main() {
     let data_loader = ViriBinpackLoader::new(
         "/data/200m.mpvtactical.vf",
         4096,
-        24,
+        34,
         viribinpack::ViriFilter::Custom(custom_filter_pipeline),
     );
 
