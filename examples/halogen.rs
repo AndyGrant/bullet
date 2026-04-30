@@ -504,7 +504,12 @@ fn wdl_eval_disagreement_filter(eval: i16, wdl: f32) -> bool {
     fast_random() >= disagreement
 }
 
+const UNKNOWN: i16 = 32001;
+
 fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move, eval: i16, wdl: f32) -> bool {
+    if eval.abs() == UNKNOWN {
+        return false;
+    }
     if board.is_tactical(mv) {
         return false;
     }
@@ -522,7 +527,7 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
 
 macro_rules! net_id {
     () => {
-        "bullet_r134"
+        "bullet-exp2-mpvtactical"
     };
 }
 
@@ -668,7 +673,7 @@ fn main() {
 
     let settings = LocalSettings { threads: 8, test_set: None, output_directory: "checkpoints", batch_queue_size: 32 };
     let data_loader = ViriBinpackLoader::new(
-        "/data/200m.standard.vf",
+        "/data/200m.mpvtactical.vf",
         4096,
         24,
         viribinpack::ViriFilter::Custom(custom_filter_pipeline),
