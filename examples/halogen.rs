@@ -521,7 +521,7 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
 
 macro_rules! net_id {
     () => {
-        "bullet-exp2-mpvtactical"
+        "bullet-exp3-onlyone"
     };
 }
 
