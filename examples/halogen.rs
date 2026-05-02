@@ -510,12 +510,6 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
     if eval.abs() == UNKNOWN {
         return false;
     }
-    if board.is_tactical(mv) {
-        return false;
-    }
-    if board.in_check() {
-        return false;
-    }
     if !wdl_eval_disagreement_filter(eval, wdl) {
         return false;
     }
@@ -671,9 +665,9 @@ fn main() {
         save_rate: 100,
     };
 
-    let settings = LocalSettings { threads: 8, test_set: None, output_directory: "checkpoints", batch_queue_size: 32 };
+    let settings = LocalSettings { threads: 8, test_set: None, output_directory: "/data/checkpoints", batch_queue_size: 32 };
     let data_loader = ViriBinpackLoader::new(
-        "/data/200m.mpvtactical.vf",
+        "/data/200m.onegood.vf",
         4096,
         34,
         viribinpack::ViriFilter::Custom(custom_filter_pipeline),
