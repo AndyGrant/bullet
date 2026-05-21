@@ -323,9 +323,6 @@ impl SparseInputType for ChessBucketsMirroredWithThreats {
 //----------------------------------
 use viriformat::chess::board::Board;
 
-/// How often to print filter pipeline stats (every N positions seen)
-const DEBUG_PRINT_INTERVAL: u64 = 10_000_000;
-
 fn piece_count_acceptance(board: &Board) -> f64 {
     #[rustfmt::skip]
     const DESIRED_DISTRIBUTION: [f64; 33] = [
@@ -379,66 +376,20 @@ fn wdl_eval_disagreement_filter(eval: i16, wdl: f32) -> bool {
     rng().random_bool((1.0 - disagreement).clamp(0.0, 1.0) as f64)
 }
 
-static FILTER_SEEN: AtomicU64 = AtomicU64::new(0);
-static FILTER_SKIPPED_PREFILTER: AtomicU64 = AtomicU64::new(0);
-static FILTER_SKIPPED_TACTICAL: AtomicU64 = AtomicU64::new(0);
-static FILTER_SKIPPED_CHECK: AtomicU64 = AtomicU64::new(0);
-static FILTER_SKIPPED_WDL: AtomicU64 = AtomicU64::new(0);
-static FILTER_SKIPPED_PIECE_COUNT: AtomicU64 = AtomicU64::new(0);
-static FILTER_LAST_PRINT: AtomicU64 = AtomicU64::new(0);
-
-fn print_filter_stats(total: u64) {
-    let pre = FILTER_SKIPPED_PREFILTER.load(Ordering::Relaxed);
-    let tactical = FILTER_SKIPPED_TACTICAL.load(Ordering::Relaxed);
-    let check = FILTER_SKIPPED_CHECK.load(Ordering::Relaxed);
-    let wdl = FILTER_SKIPPED_WDL.load(Ordering::Relaxed);
-    let piece_count = FILTER_SKIPPED_PIECE_COUNT.load(Ordering::Relaxed);
-    let kept = total.saturating_sub(pre + tactical + check + wdl + piece_count);
-    let pct = |n: u64| 100.0 * n as f64 / total as f64;
-
-    println!("\n=== Filter Pipeline ({total} positions) ===");
-    println!("  Pre Filter:     {:>10} ({:.1}%)", pre, pct(pre));
-    println!("  Tactical:       {:>10} ({:.1}%)", tactical, pct(tactical));
-    println!("  In check:       {:>10} ({:.1}%)", check, pct(check));
-    println!("  WDL disagree:   {:>10} ({:.1}%)", wdl, pct(wdl));
-    println!("  Piece count:    {:>10} ({:.1}%)", piece_count, pct(piece_count));
-    println!("  Kept:           {:>10} ({:.1}%)", kept, pct(kept));
-    println!();
-}
-
 fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move, eval: i16, wdl: f32) -> bool {
-
-    // let total = FILTER_SEEN.fetch_add(1, Ordering::Relaxed) + 1;
-
-    // let last_print = FILTER_LAST_PRINT.load(Ordering::Relaxed);
-    // if total >= last_print + DEBUG_PRINT_INTERVAL {
-    //     if FILTER_LAST_PRINT.compare_exchange(last_print, total, Ordering::SeqCst, Ordering::Relaxed).is_ok() {
-    //         print_filter_stats(total);
-    //     }
-    // }
-
     if eval.abs() == 32001 {
-        // FILTER_SKIPPED_PREFILTER.fetch_add(1, Ordering::Relaxed);
         return false;
     }
-
-    // if board.is_tactical(mv) {
-    //     // FILTER_SKIPPED_TACTICAL.fetch_add(1, Ordering::Relaxed);
-    //     return false;
-    // }
-
-    // if board.in_check() {
-    //     // FILTER_SKIPPED_CHECK.fetch_add(1, Ordering::Relaxed);
-    //     return false;
-    // }
-
+    if board.is_tactical(mv) {
+        return false;
+    }
+    if board.in_check() {
+        return false;
+    }
     if !wdl_eval_disagreement_filter(eval, wdl) {
-        // FILTER_SKIPPED_WDL.fetch_add(1, Ordering::Relaxed);
         return false;
     }
-
     if !piece_count_filter(board) {
-        // FILTER_SKIPPED_PIECE_COUNT.fetch_add(1, Ordering::Relaxed);
         return false;
     }
     true
@@ -446,11 +397,13 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
 
 macro_rules! net_id {
     () => {
-        "bullet-exp3-onlyone"
+        "bullet-baseline"
     };
 }
 
 const NET_ID: &str = net_id!();
+const DATA_PATH: &str = "/data/200m.standard.vf";
+const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
 fn main() {
     // network hyperparams
@@ -590,9 +543,9 @@ fn main() {
         save_rate: 100,
     };
 
-    let settings = LocalSettings { threads: 8, test_set: None, output_directory: "/data/checkpoints", batch_queue_size: 32 };
+    let settings = LocalSettings { threads: 8, test_set: None, output_directory: CHECKPOINT_DIR, batch_queue_size: 32 };
     let data_loader = ViriBinpackLoader::new(
-        "/data/200m.onegood.vf",
+        DATA_PATH,
         4096,
         24,
         viribinpack::ViriFilter::Custom(custom_filter_pipeline),
