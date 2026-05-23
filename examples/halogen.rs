@@ -380,12 +380,6 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
     if eval.abs() == 32001 {
         return false;
     }
-    if board.is_tactical(mv) {
-        return false;
-    }
-    if board.in_check() {
-        return false;
-    }
     if !wdl_eval_disagreement_filter(eval, wdl) {
         return false;
     }
