@@ -380,12 +380,6 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
     if eval.abs() == 32001 {
         return false;
     }
-    if board.is_tactical(mv) {
-        return false;
-    }
-    if board.in_check() {
-        return false;
-    }
     if !wdl_eval_disagreement_filter(eval, wdl) {
         return false;
     }
@@ -397,12 +391,12 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
 
 macro_rules! net_id {
     () => {
-        "bullet-exp6"
+        "bullet-exp7"
     };
 }
 
 const NET_ID: &str = net_id!();
-const DATA_PATH: &str = "/data/200m.exp6.vf";
+const DATA_PATH: &str = "/data/200m.exp7.vf";
 const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
 fn main() {
