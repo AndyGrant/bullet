@@ -397,12 +397,12 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
 
 macro_rules! net_id {
     () => {
-        "bullet-baseline"
+        "bullet-exp6"
     };
 }
 
 const NET_ID: &str = net_id!();
-const DATA_PATH: &str = "/data/200m.standard.vf";
+const DATA_PATH: &str = "/data/200m.exp6.vf";
 const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
 fn main() {
