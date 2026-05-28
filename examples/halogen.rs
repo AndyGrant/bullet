@@ -405,7 +405,7 @@ macro_rules! net_id {
 }
 
 const NET_ID: &str = net_id!();
-const DATA_PATH: &str = "/data/200m.standard.vf";
+const DATA_PATH: &str = "/data/300m.exp10.vf";
 const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
 fn main() {
