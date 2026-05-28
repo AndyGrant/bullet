@@ -364,7 +364,7 @@ fn piece_count_filter(board: &Board) -> bool {
 }
 
 /// Eval scale used for sigmoid (same as eval_scale in training config)
-const EVAL_SCALE: f32 = 160.0;
+const EVAL_SCALE: f32 = 208.0;
 
 fn sigmoid(eval: f32) -> f32 {
     1.0 / (1.0 + (-eval / EVAL_SCALE).exp())
@@ -397,7 +397,7 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
 
 macro_rules! net_id {
     () => {
-        "bullet-exp10"
+        "bullet-exp12"
     };
 }
 
@@ -570,6 +570,6 @@ fn main() {
     ] {
         let eval = trainer.eval(fen);
         println!("FEN: {fen}");
-        println!("EVAL: {}", 160.0 * eval);
+        println!("EVAL: {}", EVAL_SCALE * eval);
     }
 }
