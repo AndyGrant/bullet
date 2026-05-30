@@ -380,6 +380,9 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
     if eval.abs() == 32001 {
         return false;
     }
+    if rng().random_bool(0.9) {
+        return false;
+    }
     if board.is_tactical(mv) {
         return false;
     }
@@ -397,7 +400,7 @@ fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move,
 
 macro_rules! net_id {
     () => {
-        "bullet-exp15"
+        "bullet-exp16"
     };
 }
 
