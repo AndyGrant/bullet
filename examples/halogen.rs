@@ -323,7 +323,20 @@ impl SparseInputType for ChessBucketsMirroredWithThreats {
 //----------------------------------
 use viriformat::chess::board::Board;
 
-fn piece_count_acceptance(board: &Board) -> f64 {
+/// Eval scale used for sigmoid (same as eval_scale in training config)
+const EVAL_SCALE: f32 = 160.0;
+
+fn sigmoid(eval: f32) -> f32 {
+    1.0 / (1.0 + (-eval / EVAL_SCALE).exp())
+}
+
+fn wdl_eval_disagreement_filter(eval: i16, wdl: f32) -> bool {
+    let eval_wdl = sigmoid(eval as f32);
+    let disagreement = (wdl - eval_wdl).abs();
+    rng().random_bool((1.0 - disagreement).clamp(0.0, 1.0) as f64)
+}
+
+fn piece_count_filter(board: &Board) -> bool {
     #[rustfmt::skip]
     const DESIRED_DISTRIBUTION: [f64; 33] = [
         0.018411966423, 0.020641545085, 0.022727271053,
@@ -356,53 +369,29 @@ fn piece_count_acceptance(board: &Board) -> f64 {
     let frequency = count as f64 / total as f64;
 
     let acceptance = 0.5 * DESIRED_DISTRIBUTION[pc] / frequency;
-    acceptance.clamp(0., 1.)
+    rng().random_bool(acceptance.clamp(0., 1.))
 }
 
-fn piece_count_filter(board: &Board) -> bool {
-    rng().random_bool(piece_count_acceptance(board))
+fn stage1_filter_pipeline(board: &Board, _mv: viriformat::chess::chessmove::Move, eval: i16, wdl: f32) -> bool {
+    eval.abs() != 32001 && wdl_eval_disagreement_filter(eval, wdl) && piece_count_filter(board)
 }
 
-/// Eval scale used for sigmoid (same as eval_scale in training config)
-const EVAL_SCALE: f32 = 160.0;
-
-fn sigmoid(eval: f32) -> f32 {
-    1.0 / (1.0 + (-eval / EVAL_SCALE).exp())
+fn stage2_filter_pipeline(board: &Board, _mv: viriformat::chess::chessmove::Move, eval: i16, wdl: f32) -> bool {
+    eval.abs() != 32001 && wdl_eval_disagreement_filter(eval, wdl) && piece_count_filter(board)
 }
 
-fn wdl_eval_disagreement_filter(eval: i16, wdl: f32) -> bool {
-    let eval_wdl = sigmoid(eval as f32);
-    let disagreement = (wdl - eval_wdl).abs();
-    rng().random_bool((1.0 - disagreement).clamp(0.0, 1.0) as f64)
-}
-
-fn custom_filter_pipeline(board: &Board, mv: viriformat::chess::chessmove::Move, eval: i16, wdl: f32) -> bool {
-    if eval.abs() == 32001 {
-        return false;
-    }
-    if board.is_tactical(mv) {
-        return false;
-    }
-    if board.in_check() {
-        return false;
-    }
-    if !wdl_eval_disagreement_filter(eval, wdl) {
-        return false;
-    }
-    if !piece_count_filter(board) {
-        return false;
-    }
-    true
-}
-
-macro_rules! net_id {
-    () => {
-        "bullet-baseline"
-    };
-}
+macro_rules! net_id { () => { "bullet-baseline" }; }
 
 const NET_ID: &str = net_id!();
-const DATA_PATH: &str = "/data/300m.exp10.vf";
+const STAGE1_DATA_PATH: &str = "/data/300m.exp10.vf";
+const STAGE2_DATA_PATH: &str = "/data/300m.exp10.vf";
+
+// If true, load the stage-1 checkpoint below and skip the stage-1 training run.
+// The checkpoint directory is "/data/{exp}/{exp}-stage1-{superbatch}",
+// e.g. "/data/bullet-exp16/bullet-exp16-stage1-900".
+const LOAD_FROM_STAGE1: bool = false;
+const LOAD_FROM_EXPERIMENT: &str = "bullet-{exp}";
+const LOAD_FROM_SUPERBATCH: usize = 900;
 const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
 fn main() {
@@ -549,16 +538,20 @@ fn main() {
     };
 
     let settings = LocalSettings { threads: 8, test_set: None, output_directory: CHECKPOINT_DIR, batch_queue_size: 32 };
-    let data_loader = ViriBinpackLoader::new(
-        DATA_PATH,
-        4096,
-        24,
-        viribinpack::ViriFilter::Custom(custom_filter_pipeline),
-    );
+    let stage1_filter = viribinpack::ViriFilter::Custom(stage1_filter_pipeline);
+    let stage2_filter = viribinpack::ViriFilter::Custom(stage2_filter_pipeline);
 
-    //trainer.load_from_checkpoint("checkpoints/bullet_r124-stage2-100");
-    trainer.run(&stage_1_schedule, &settings, &data_loader);
-    trainer.run(&stage_2_schedule, &settings, &data_loader);
+    let stage_1_data_loader = ViriBinpackLoader::new(STAGE1_DATA_PATH, 2048, 24, stage1_filter);
+    let stage_2_data_loader = ViriBinpackLoader::new(STAGE2_DATA_PATH, 2048, 24, stage2_filter);
+
+    if LOAD_FROM_STAGE1 {
+        let checkpoint = format!("/data/{LOAD_FROM_EXPERIMENT}/{LOAD_FROM_EXPERIMENT}-stage1-{LOAD_FROM_SUPERBATCH}");
+        trainer.load_from_checkpoint(&checkpoint);
+    } else {
+        trainer.run(&stage_1_schedule, &settings, &stage_1_data_loader);
+    }
+
+    trainer.run(&stage_2_schedule, &settings, &stage_2_data_loader);
 
     for fen in [
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
