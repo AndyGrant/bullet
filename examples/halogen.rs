@@ -388,7 +388,9 @@ fn stage2_filter_pipeline(board: &Board, _mv: viriformat::chess::chessmove::Move
 
 macro_rules! net_id { () => { "bullet-baseline" }; }
 const NET_ID: &str = net_id!();
+const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
+// Data selection
 const STAGE1_DATA_PATH: &str = "/data/300m.exp10.vf";
 const STAGE2_DATA_PATH: &str = "/data/300m.exp10.vf";
 
@@ -398,7 +400,6 @@ const STAGE2_DATA_PATH: &str = "/data/300m.exp10.vf";
 const LOAD_FROM_STAGE1: bool = false;
 const LOAD_FROM_EXPERIMENT: &str = "bullet-{exp}";
 const LOAD_FROM_SUPERBATCH: usize = 900;
-const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
 fn main() {
     // network hyperparams
