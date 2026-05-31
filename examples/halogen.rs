@@ -391,8 +391,8 @@ const NET_ID: &str = net_id!();
 const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
 // Data selection
-const STAGE1_DATA_PATH: &str = "/data/300m.exp10.vf";
-const STAGE2_DATA_PATH: &str = "/data/300m.exp10.vf";
+const STAGE1_DATA_PATH: &str = "/data/200m.standard.vf";
+const STAGE2_DATA_PATH: &str = "/data/200m.standard.vf";
 
 // If true, load the stage-1 checkpoint below and skip the stage-1 training run.
 // The checkpoint directory is "/data/{exp}/{exp}-stage1-{superbatch}",
