@@ -1,7 +1,9 @@
 use std::mem::MaybeUninit;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
+
 use rand::{Rng, rng};
+use viriformat::chess::board::Board;
 
 use bullet_lib::{
     game::{
@@ -21,7 +23,10 @@ use bullet_lib::{
     },
 };
 
-/// Piece types in ChessBoard encoding: bits 0-2
+// ============================================================
+// Threat table construction
+// ============================================================
+
 const PAWN: u8 = 0;
 const KNIGHT: u8 = 1;
 const BISHOP: u8 = 2;
@@ -29,9 +34,9 @@ const ROOK: u8 = 3;
 const QUEEN: u8 = 4;
 const KING: u8 = 5;
 
-/// Get attack bitboard for a given piece type on a given square.
-/// `side` is 0 for STM, 1 for NSTM (only matters for pawns).
 fn attacks_for(piece_type: u8, sq: usize, side: usize, occ: u64) -> u64 {
+    // Get attack bitboard for a given piece type on a given square.
+    // `side` is 0 for STM, 1 for NSTM (only matters for pawns).
     match piece_type {
         PAWN => Attacks::pawn(sq, side),
         KNIGHT => Attacks::knight(sq),
@@ -43,12 +48,8 @@ fn attacks_for(piece_type: u8, sq: usize, side: usize, occ: u64) -> u64 {
     }
 }
 
-// ============================================================
-// Threat table construction
-// ============================================================
-
-/// Check if an attacker piece type is allowed to threaten a victim piece type.
 fn can_threaten(atk_piece: u8, vic_piece: u8) -> bool {
+    // Check if an attacker piece type is allowed to threaten a victim piece type.
     match atk_piece {
         PAWN => matches!(vic_piece, PAWN | KNIGHT | ROOK),
         BISHOP | ROOK => vic_piece != QUEEN,
@@ -57,8 +58,9 @@ fn can_threaten(atk_piece: u8, vic_piece: u8) -> bool {
     }
 }
 
-/// Precomputed lookup table mapping (attacker, square, victim, square) -> feature index.
 struct ThreatTables {
+    // Precomputed lookup table mapping (attacker, square, victim, square) -> feature index.
+
     /// Total number of threat features (per perspective).
     total_threat_features: usize,
 
@@ -121,8 +123,6 @@ impl ThreatTables {
         Self { total_threat_features, lookup }
     }
 
-    /// Get the threat feature index for an attacker threatening a victim.
-    /// Returns None if this threat is not tracked (duplicate or excluded).
     #[inline]
     fn threat_feature(
         &self,
@@ -133,6 +133,8 @@ impl ThreatTables {
         vic_side: usize,
         vic_sq: usize,
     ) -> Option<usize> {
+        // Get the threat feature index for an attacker threatening a victim.
+        // Returns None if this threat is not tracked (duplicate or excluded).
         let atk_idx = atk_piece as usize * 2 + atk_side;
         let vic_idx = vic_piece as usize * 2 + vic_side;
 
@@ -155,15 +157,15 @@ fn get_threat_tables() -> &'static ThreatTables {
 // ChessBucketsMirroredWithThreats
 // ============================================================
 
-/// Every piece always activates a king-bucketed (piece, square) feature.
-/// Pieces with active threats additionally activate threat features.
-///
-/// Feature layout:
-///   [0, 768 * num_buckets)               : king-bucketed piece-square
-///   [768 * num_buckets, +768)            : manual factorizer for king-bucketed portion (see below)
-///   [768 * num_buckets, ...)             : threat features
 #[derive(Clone)]
 struct ChessBucketsMirroredWithThreats {
+    // Every piece always activates a king-bucketed (piece, square) feature.
+    // Pieces with active threats additionally activate threat features.
+    //
+    // Feature layout:
+    //   [0, 768 * num_buckets)               : king-bucketed piece-square
+    //   [768 * num_buckets, +768)            : manual factorizer for king-bucketed portion (see below)
+    //   [768 * num_buckets, ...)             : threat features
     buckets: [usize; 64],
     num_buckets: usize,
     /// Base offset for unbucketed piece-square features (= 768 * num_buckets)
@@ -193,10 +195,10 @@ impl ChessBucketsMirroredWithThreats {
     }
 }
 
-/// Extract piece list from a ChessBoard's packed representation.
-/// Returns array of (piece_nibble, square) pairs and the count.
 #[inline]
 fn extract_pieces(pos: &ChessBoard) -> ([(u8, usize); 32], usize) {
+    // Extract piece list from a ChessBoard's packed representation.
+    // Returns array of (piece_nibble, square) pairs and the count.
     let mut result = [(0u8, 0usize); 32];
     let mut count = 0;
     let mut occ = pos.occ();
@@ -320,10 +322,10 @@ impl SparseInputType for ChessBucketsMirroredWithThreats {
     }
 }
 
-//----------------------------------
-use viriformat::chess::board::Board;
+// ============================================================
+// Data Filtering
+// ============================================================
 
-/// Eval scale used for sigmoid (same as eval_scale in training config)
 const EVAL_SCALE: f32 = 160.0;
 
 fn sigmoid(eval: f32) -> f32 {
@@ -380,9 +382,13 @@ fn stage2_filter_pipeline(board: &Board, _mv: viriformat::chess::chessmove::Move
     eval.abs() != 32001 && wdl_eval_disagreement_filter(eval, wdl) && piece_count_filter(board)
 }
 
-macro_rules! net_id { () => { "bullet-baseline" }; }
+// ============================================================
+// Quick Training Configuration
+// ============================================================
 
+macro_rules! net_id { () => { "bullet-baseline" }; }
 const NET_ID: &str = net_id!();
+
 const STAGE1_DATA_PATH: &str = "/data/300m.exp10.vf";
 const STAGE2_DATA_PATH: &str = "/data/300m.exp10.vf";
 
