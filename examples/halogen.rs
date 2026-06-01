@@ -386,7 +386,7 @@ fn stage2_filter_pipeline(board: &Board, _mv: viriformat::chess::chessmove::Move
 // Quick Training Configuration
 // ============================================================
 
-macro_rules! net_id { () => { "bullet-baseline" }; }
+macro_rules! net_id { () => { "bullet-exp18" }; }
 const NET_ID: &str = net_id!();
 const CHECKPOINT_DIR: &str = concat!("/data/", net_id!());
 
